@@ -1,0 +1,24 @@
+paths:
+  originals_dir: "path here"
+  output_dir: "path here"
+  thumbs_subdir: "thumbs"
+  fonts_dir: "fonts"
+  watermark_font: "Montserrat-Black.ttf"
+
+resize:
+  width: 1500
+  height: 1000
+  quality: 100
+
+thumbnail:
+  width: 548
+  height: 365
+  quality: 100
+
+watermark:
+  text: "your text here"
+  font_size: 40
+  opacity: 128
+  color: [255, 255, 255]
+  shadow: true
+  margin_percent: [12, 2, 21, 0]  # left, right, top, bottom
