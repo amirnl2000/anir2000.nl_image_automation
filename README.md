@@ -108,7 +108,9 @@ Developed by [Amir Darzi](https://www.amir2000.nl/about.php) to automate high-qu
 ---
 
 📁 Live Website: [amir2000.nl](https://www.amir2000.nl)  
-🛠️ Latest Working UI: See `/screenshots/` for sample images
+🛠️ Latest Working UI: 
+
+![amir2000_image_automation](https://github.com/user-attachments/assets/1507a0ac-7910-4760-b955-539664ed5d11)
 
 ---
 
