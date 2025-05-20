@@ -12,7 +12,7 @@ if os.path.exists(db_path):
 conn = sqlite3.connect(db_path)
 c = conn.cursor()
 
-# Create the review_queue table with a dedicated Review_Status field
+# Create the review_queue table with all needed scoring/review fields
 c.execute("""
 CREATE TABLE review_queue (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,7 +33,11 @@ CREATE TABLE review_queue (
     Caption TEXT,
     Location TEXT,
     Subject TEXT,
-    QR INTEGER,
+    nima_score REAL,
+    blur_score REAL,
+    brightness_score REAL,
+    contrast_score REAL,
+    QR REAL,
     QC_Status TEXT,
     Review_Status TEXT,
     Original_File_Name TEXT
@@ -42,4 +46,4 @@ CREATE TABLE review_queue (
 
 conn.commit()
 conn.close()
-"✅ Database initialized with review_queue including Review_Status and untouched QC_Status."
+print("✅ Database initialized with review_queue (incl. all scoring/quality fields, Review_Status, QC_Status).")

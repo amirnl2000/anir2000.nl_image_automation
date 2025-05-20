@@ -1,20 +1,19 @@
 import os
-import shutil
+import sys
 import sqlite3
 import json
+import shutil
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import subprocess
+import threading
 
 from utils.file_namer import get_exif_data, get_camera_model, get_exif_year, generate_unique_filename
-from utils.image_processor import resize_and_watermark
 from utils.metadata_builder import build_metadata
 
-DB_PATH =  "data/review.db"
+DB_PATH = "data/review.db"
 TABLE_NAME = "review_queue"
-ORIGINALS_ROOT = r"path here"
-LOCAL_BASE = r"path here"
-DESKTOP_ROOT = r"path here"
+INCOMING_DIR = r"C:\Users\YOUR_USERNAME\incoming"
 LOCATION_FILE = os.path.join("data", "location_list.json")
 FOLDER_MAP_FILE = os.path.join("data", "folder_map.json")
 
@@ -35,20 +34,20 @@ class ImageAutomationApp:
         ttk.Entry(frm, textvariable=self.subject_var, width=50).grid(row=0, column=1, sticky="ew")
         ttk.Label(frm, text="Location:").grid(row=1, column=0, sticky="w")
         locs = self.load_json(LOCATION_FILE)
-        locs.sort()  # ✅ Sort alphabetically
+        locs.sort()
         self.loc_combo = ttk.Combobox(frm, values=locs, textvariable=self.location_var, width=48)
         self.loc_combo.grid(row=1, column=1, sticky="ew")
         self.loc_combo.bind("<FocusOut>", lambda e: self.save_new(self.location_var.get(), LOCATION_FILE))
         ttk.Label(frm, text="Folder (category):").grid(row=2, column=0, sticky="w")
         fmap = self.load_json(FOLDER_MAP_FILE)
         self.folder_key_lookup = {v: k for k, v in fmap.items()}
-        folder_names = sorted(fmap.values())  # ✅ sorted list
+        folder_names = sorted(fmap.values())
         self.folder_combo = ttk.Combobox(frm, values=folder_names, textvariable=self.folder_var, width=48)
         self.folder_combo.grid(row=2, column=1, sticky="ew")
         ttk.Button(frm, text="Select Images", command=self.select_images).grid(row=3, column=0, columnspan=2, pady=5)
         self.file_list = tk.Listbox(frm, width=80, height=8)
         self.file_list.grid(row=4, column=0, columnspan=2, pady=5)
-        ttk.Button(frm, text="Start Batch", command=self.proceed).grid(row=5, column=0, columnspan=2, pady=10)
+        ttk.Button(frm, text="Start Batch", command=lambda: threading.Thread(target=self.proceed).start()).grid(row=5, column=0, columnspan=2, pady=10)
         frm.columnconfigure(1, weight=1)
 
     def load_json(self, path):
@@ -80,23 +79,27 @@ class ImageAutomationApp:
                 self.file_list.insert(tk.END, os.path.basename(f))
 
     def proceed(self):
+        print("\n[STAGE 1] Input validation and collecting files...")
         subj = self.subject_var.get().strip()
         loc = self.location_var.get().strip()
         fld_readable = self.folder_var.get().strip()
         fld = self.folder_key_lookup.get(fld_readable, fld_readable)
+
         if not (subj and loc and fld):
             messagebox.showwarning("Missing fields", "Fill in Subject, Location, and Folder.")
+            print("[ERROR] Missing required fields.")
             return
         if not self.images:
             messagebox.showwarning("No images", "No images selected.")
+            print("[ERROR] No images selected.")
             return
 
+        print("[STAGE 2] Preparing database and moving images to incoming folder...")
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
 
         c.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}'")
         exists = c.fetchone()
-
         if not exists:
             c.execute(f"""CREATE TABLE {TABLE_NAME} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,27 +112,23 @@ class ImageAutomationApp:
             )""")
             conn.commit()
 
+        os.makedirs(INCOMING_DIR, exist_ok=True)
         for src in self.images:
             original_name = os.path.basename(src)
-            exif = get_exif_data(src)
+            incoming_path = os.path.join(INCOMING_DIR, original_name)
+            if not os.path.exists(incoming_path):
+                shutil.move(src, incoming_path)
+
+            exif = get_exif_data(incoming_path)
             cam = get_camera_model(exif)
             year = get_exif_year(exif)
-            new_nm = generate_unique_filename(subj, loc, fld, cam, year)
-            orig_dir = os.path.join(ORIGINALS_ROOT, year, fld)
-            os.makedirs(orig_dir, exist_ok=True)
-            dest_orig = os.path.join(orig_dir, new_nm)
-            shutil.move(src, dest_orig)
-            web_dir = os.path.join(LOCAL_BASE, year, fld)
-            thumb_dir = os.path.join(LOCAL_BASE, year, "thumbs", fld)
-            desk_dir = os.path.join(DESKTOP_ROOT, fld)
-            for d in (web_dir, thumb_dir, desk_dir): os.makedirs(d, exist_ok=True)
-            web_path = os.path.join(web_dir, new_nm)
-            thumb_path = os.path.join(thumb_dir, new_nm)
-            desk_path = os.path.join(desk_dir, new_nm)
-            resize_and_watermark(dest_orig, web_path, thumb_path, desk_path, "your text here", "fonts/Montserrat-Light.ttf")
-            meta = build_metadata(dest_orig, web_path, new_nm, fld, year, loc, subj)
+            suggested_name = generate_unique_filename(subj, loc, fld, cam, year)
+            meta = build_metadata(incoming_path, "", suggested_name, fld, year, loc, subj)
             meta["Review_Status"] = "Pending"
             meta["Original_File_Name"] = original_name
+            meta["Path"] = incoming_path
+            meta["Thumb_Path"] = ""
+
             fields = ",".join(meta.keys())
             placeholders = ",".join(["?"] * len(meta))
             sql = f"INSERT INTO {TABLE_NAME} ({fields}) VALUES ({placeholders})"
@@ -137,11 +136,22 @@ class ImageAutomationApp:
 
         conn.commit()
         conn.close()
-        messagebox.showinfo("Batch Complete", f"✅ Processed {len(self.images)} images.")
-        subprocess.run(["python", "review_editor.py"], check=False)
+        print(f"[STAGE 3] Inserted {len(self.images)} images to DB. Moving to scoring...")
+
+        messagebox.showinfo("Batch Ready", f"✅ {len(self.images)} images ready for scoring & review.")
+
+        # Score images using external script
+        print("[STAGE 4] Starting image scoring (this can take a moment)...")
+        subprocess.run([sys.executable, "batch_image_quality_score.py"], check=True)
+        print("[STAGE 5] Scoring done. Launching review/approval interface...")
+
+        subprocess.run([sys.executable, "review_editor.py"], check=False)
+        print("[STAGE 6] Review/editor closed. Exiting main UI.")
         self.root.destroy()
 
 if __name__ == '__main__':
+    print("\n========= Amir2000 Image Automation: MAIN START =========")
     root = tk.Tk()
     app = ImageAutomationApp(root)
     root.mainloop()
+    print("========= Amir2000 Image Automation: MAIN END =========")

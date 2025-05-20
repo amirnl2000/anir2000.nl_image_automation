@@ -23,8 +23,14 @@ CREATE TABLE review_queue (
     Caption TEXT,
     Location TEXT,
     Subject TEXT,
-    QR INTEGER,
-    QC_Status TEXT
+    nima_score REAL,
+    blur_score REAL,
+    brightness_score REAL,
+    contrast_score REAL,
+    QR REAL,
+    QC_Status TEXT,
+    Review_Status TEXT,
+    Original_File_Name TEXT
 );
 """
 
@@ -34,7 +40,7 @@ def reset_table():
     c.executescript(schema)
     conn.commit()
     conn.close()
-    print("✅ review_queue table recreated successfully.")
+    print("✅ review_queue table recreated successfully with all scoring and review fields.")
 
 if __name__ == "__main__":
     reset_table()

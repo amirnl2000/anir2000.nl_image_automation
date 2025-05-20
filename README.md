@@ -1,119 +1,116 @@
-# amir2000.nl | Image Automation Pipeline
+# amir2000_image_automation
 
-This project powers the complete automation pipeline for managing high-quality images on [amir2000.nl](https://www.amir2000.nl). It enables a streamlined process from local image import and metadata generation to FTP uploads and remote MySQL insertion. The workflow is optimized for professional photography publication and scalability.
-
----
-
-## 📸 Key Features
-
-- **Manual image selection** via UI with Subject, Location, and Folder categorization
-- **Automatic EXIF extraction** and smart renaming based on metadata
-- **Smart filename generation** with collision checks using `used_filenames.json`
-- **Web-optimized image resizing** (1500px) + thumbnail (548x365px)
-- **Watermarking** with custom font and layout
-- **Metadata enrichment** (EXIF + random caption/keywords based on folder)
-- **Review UI** for manual curation + correction
-- **Automatic DB + FTP upload** upon approval
-- **Dual database management**: local (SQLite) + remote (MySQL)
-- **Logging and error tracking** for DB/FTP failures
+A modular, GUI-driven workflow for reviewing, scoring, and uploading photography, with local + MySQL/FTP sync.
 
 ---
 
-## 📂 Folder Structure
+## Features
+
+- Batch ingestion of images via GUI (Tkinter)
+- Smart filename generator based on subject/location/camera/year
+- EXIF extraction and automatic metadata builder
+- ML-based image quality scoring (NIMA, sharpness, etc.)
+- Review/editor interface for manual override and approval
+- Automatic sync to MySQL database & FTP upload to web host
+- Local-first workflow, cross-platform compatible (Windows tested)
+- One-click batch launch: double-click a single `.bat` file
+
+---
+
+## Workflow Overview
+
+1. **Prepare new images** in the `incoming/` folder.
+2. **Launch the GUI** with `run_upload.bat` (recommended) or `python main.py`.
+3. **Select images, enter subject/location/folder** (category).
+4. **System auto-extracts EXIF, builds filenames, moves files to processing folder.**
+5. **ML scoring** (NIMA/technical quality) is run on images.
+6. **Manual review/editor UI:** approve/reject/edit captions/keywords if needed.
+7. **On approval:** upload metadata to MySQL and images to FTP.
+8. **Session completes:** terminal returns to ready-to-run.
+
+---
+
+## Project Structure
 
 ```
-├── main.py                  # Main entry: UI for processing selected images
-├── review_editor.py         # Manual review interface for metadata edits
-├── db_uploader.py           # Final step: uploads to MySQL & FTP
-├── clear_review.py          # Utility to reset review.db
-├── data/
-│   ├── review.db            # SQLite metadata store
-│   ├── used_filenames.json  # Tracks used filenames to avoid collisions
-│   ├── caption_templates.json # Captions + keywords per folder
-│   ├── folder_map.json      # Folder key to display name mapping
-│   └── location_list.json   # All used Locations for dropdowns
-├── utils/
-│   ├── metadata_builder.py  # Build metadata (EXIF, caption, keywords)
-│   ├── file_namer.py        # Handle EXIF read, filename generation
-│   └── image_processor.py   # Resize, watermark, thumbnail creation
-├── fonts/
-│   └── Montserrat-Light.ttf # Watermark font
-└── README.md                # You're reading this
-```
+
+amir2000\_image\_automation/
+│
+├── main.py                    # Entry point for GUI and ingestion pipeline
+├── batch\_image\_quality\_score.py # ML scoring (NIMA, sharpness, etc.)
+├── review\_editor.py           # Manual approval/override interface
+├── db\_uploader.py             # Syncs reviewed images to MySQL/FTP
+├── utils/                     # Helper modules: EXIF, renaming, metadata, etc.
+├── data/                      # SQLite DB, JSON location/folder mappings
+├── run\_upload.bat             # Preferred way to launch the pipeline
+└── README.md                  # (This file)
+
+````
 
 ---
 
-## 🧠 Process Flow
+## First-Time Setup
 
-### Step 1: Image Selection
-- UI in `main.py` allows user to select files and define Subject, Location, Folder.
-- The dropdowns for Location and Folder auto-update using `location_list.json` and `folder_map.json`.
+1. **Clone this repo and extract it to your preferred folder.**
 
-### Step 2: Rename & Process
-- Files are **moved** to the local archive: `path here/{year}/{folder}`
-- Each file is renamed using a unique, SEO-friendly format:  
-  `Subject_Location_Folder_Camera_Year_###.JPG`
-- Resized, watermarked, and thumbnails are generated for:
-  - Live site: `path here/...`
-  - Review copy: `path here/...`
-- EXIF + AI-enhanced metadata (caption/keywords) is created
-- Final records are stored in SQLite `review.db`
+2. **Set up Anaconda environment** (one-time):
 
-### Step 3: Review & Approve
-- Launches `review_editor.py` to:
-  - Edit metadata (caption, keywords, etc.)
-  - Approve, reject, or leave Pending
-  - Rejected files are moved to: `path here/rejected/`
-  - Approved ones trigger next step: auto-launch `db_uploader.py`
+    ```sh
+    conda create -n imgquality python=3.11
+    conda activate imgquality
+    pip install pyiqa Pillow ftplib mysql-connector-python tqdm
+    ```
 
-### Step 4: Upload to Web
-- `db_uploader.py`:
-  - Verifies **no duplicate filename** exists in remote MySQL
-  - Inserts data into `photos_info_revamp1` (or live `photos_info_revamp`)
-  - Uploads web + thumb images via FTP to `path here/...`
-  - Marks local `review.db` row as `Uploaded`
+    _Install any other required libraries if prompted._
+
+3. **Edit config variables** in `db_uploader.py` and other config files for your local paths and credentials.  
+   **DO NOT upload your real credentials or private info to GitHub!**
+
+4. **Edit `run_upload.bat`** with your local username and full paths if needed.
+
+5. **Launch with `run_upload.bat`** — no need to manually activate environments each time.
 
 ---
 
-## 💾 Data Fields (SQLite + MySQL)
-- `Folder`
-- `File_Name`
-- `Original_File_Name`
-- `Path`
-- `Thumb_Path`
-- `DateTime`
-- `Camera`
-- `Lens_model`
-- `Width`, `Height`
-- `Exposure`, `Aperture`, `ISO`, `Focal_length`
-- `Keywords`, `Caption`, `Location`, `Subject`
-- `QR` (nullable)
-- `QC_Status` ('NA' by default)
-- `Review_Status` ('Pending', 'Approved', 'Rejected', 'Uploaded')
+## Example `run_upload.bat`
+
+```bat
+@echo off
+echo ==== Activating imgquality environment ====
+call "C:\ProgramData\anaconda3\Scripts\activate.bat" imgquality
+
+echo ==== Changing to image automation project directory ====
+cd /d "C:\Users\YOUR_USERNAME\amir2000_image_automation"
+
+echo ==== Running Main Pipeline ====
+python main.py
+
+echo.
+echo ==== Process finished. Press any key to close. ====
+pause >nul
+````
+
+**Change the paths to match your system!**
 
 ---
 
-## 🔮 Future Enhancements
+## Notes
 
-- Integrate image quality model (NIMA, CLIP) to auto-suggest `QR` (quality rating)
-- Train LLM/embedding model for dynamic caption & keyword generation
-- Admin page for dashboard statistics & AI fine-tuning
-- Slack or Email webhook alerts for upload success/failure
-
----
-
-## 📸 Credits
-Developed by [Amir Darzi](https://www.amir2000.nl/about.php) to automate high-quality image publishing, speed up website updates, and prepare for AI-driven photo metadata generation.
+* **Windows/Anaconda/Python 3.11+ required**
+* All local/external paths, database and FTP credentials are in `db_uploader.py` — **Edit these before using!**
+* For security, never commit credentials or personal paths to public repos.
+* If you have issues with environment activation, try running via Anaconda Prompt or adjust `run_upload.bat`.
 
 ---
 
-📁 Live Website: [amir2000.nl](https://www.amir2000.nl)  
-🛠️ Latest Working UI: 
+## Credits
 
-![amir2000_image_automation](https://github.com/user-attachments/assets/1507a0ac-7910-4760-b955-539664ed5d11)
+Project by Amir Darzi ([amir2000.nl](https://www.amir2000.nl)), modularized for full-automation photo workflows.
 
 ---
 
-Feel free to fork, adapt, or extend for your own creative workflow!
+## License
 
-MIT License.
+MIT License (or specify your own)
+
+

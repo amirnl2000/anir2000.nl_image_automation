@@ -1,6 +1,6 @@
 paths:
-  originals_dir: "path here"
-  output_dir: "path here"
+  originals_dir: "C:/Users/YOUR_USERNAME/Pictures/"
+  output_dir: "C:/Users/YOUR_USERNAME/Pictures/processed/"
   thumbs_subdir: "thumbs"
   fonts_dir: "fonts"
   watermark_font: "Montserrat-Black.ttf"
@@ -16,7 +16,7 @@ thumbnail:
   quality: 100
 
 watermark:
-  text: "your text here"
+  text: "your watermark text"
   font_size: 40
   opacity: 128
   color: [255, 255, 255]
